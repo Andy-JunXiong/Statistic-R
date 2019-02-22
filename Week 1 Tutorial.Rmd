@@ -1,0 +1,47 @@
+---
+title: "Tutorial week 1"
+author: "Jun Xiong SID:470540420"
+date: "2018/8/1"
+output: html_document
+---
+
+#Read the data
+```{r}
+communities_crime <- read.delim("/Users/Andy/Desktop/Data Science/2_STAT 5003_Statistical Computing/W1_Data/communities.data", sep = ',', header = FALSE)
+```
+```{r}
+names <- read.delim("/Users/Andy/Desktop/Data Science/2_STAT 5003_Statistical Computing/W1_Data/communities.names", sep = ',', head = FALSE)
+```
+
+#Descriptive statistics to summarise data
+```{r}
+response <- communities_crime[,128]
+boxplot(response)
+hist(response, xlab = "Crime Rate")
+sd(response)
+```
+```{r}
+# selecting variable containing no missing values
+selected <- (colSums(communities_crime == "?") == 0)
+datComplete <- communities_crime[selected]
+
+# selecting variables that are numeric
+#datComplete[,-2], delete the second column
+datNumeric <- apply(datComplete[,-2], 2, as.numeric)
+
+# use a loop to calculate correlation of each variable to the response variable
+#create an empty vector
+correlationVector <- c()
+#the loop is from 1 to the length of datNumetric
+for(i in 1:ncol(datNumeric)) {
+  #c the two values together
+  correlationVector <- c(correlationVector, cor(datNumeric[,i], response))
+  #print(correlationVector)
+}
+names(correlationVector) <- colnames(datNumeric)
+#head(correlationVector)
+
+# sort the variable by correlation from high to low and select the top 9
+newNames<- names[selected,]
+newNames[-2][order(abs(correlationVector), decreasing = TRUE)[1:9]]
+```
