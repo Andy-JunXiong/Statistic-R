@@ -1,0 +1,202 @@
+---
+title: "Tutorial week 2"
+author: "Jun Xiong SID:470540420"
+date: "2018/8/8"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+#Install "ClueR" R package and its dependent packages.
+#Find out how to use it by typing "?runClue"
+
+```{r}
+"?runClue"
+```
+
+1.1 help(runClue) First
+
+```{r}
+## simulate a time-series phosphoproteomics data with 4 clusters and
+## each cluster with a size of 100 phosphosites
+simuData <- temporalSimu(seed = 1, groupSize = 100, sdd = 1, numGroups = 4)
+
+## create an artificial annotation database. Specifically, Generate 50
+## kinase-substrate groups each comprising 20 substrates assigned to a kinase. 
+## Among them, create 5 groups each contains phosphosites defined 
+## to have the same temporal profile.
+kinaseAnno <- list()
+groupSize <- 100
+for (i in 1:5) {
+  kinaseAnno[[i]] <- paste("p", (groupSize * (i-1) + 1):(groupSize * (i-1) + 20), seq = '_')}
+for (i in 6:50) {
+  ## set random seed, A specific seed can produce a specific pseudo-random sequence.    ## The main purpose of this function is to make your simulation reproducible,         ## because many times we need to take random numbers, but when this code runs again,   ## theresult is Not the same, if you need to repeat the same simulation results, you   ## can use set.seed()
+  set.seed(i)
+  ## sample.int(x, size = n), x represent the range of randome select and size means
+  ## the number that you want to select
+  kinaseAnno[[i]] <- paste("p", sample.int(nrow(simuData), size = 20), sep="_")
+}
+names(kinaseAnno) <- paste("KS", 1:50, sep="_")
+
+## run CLUE with a repeat of 3 times and a range from 2 to 8
+set.seed(1)
+cl <- runClue(Tc=simuData, annotation=kinaseAnno, rep=3, kRange=8)
+
+## visualize the evaluation outcome
+## col = rainbow(8) means rainbow color, main is the title of the graph
+boxplot(cl$evlMat, col=rainbow(8), las=2, xlab="# cluster", ylab="Enrichment", main="CLUE")
+## abline v means the x-value for vertical lines
+abline(v=(cl$maxK-1), col=rgb(1,0,0,.3))
+
+## generate optimal clustering results using the optimal k determined by CLUE
+## rep means the number of times (default is 5) the clustering is to be repeated to ## ## find the best clustering result.
+
+best <- clustOptimal(cl, rep=3, mfrow=c(2, 3))
+
+## list enriched clusters
+best$enrichList
+
+## obtain the optimal clustering object
+best$clustObj
+```
+
+1.2 help(runClue) Second
+Running CLUE with a phosphoproteomics dataset, discover optimal number of clusters,
+clustering data accordingly, and identify key kinases involved in each cluster.
+
+```{r}
+## load the human ES phosphoprotoemics data (Rigbolt et al. Sci Signal. 4(164):rs3, 2011)
+data(hES)
+# load the PhosphoSitePlus annotations (Hornbeck et al. Nucleic Acids Res. 40:D261-70, 2012)
+# note that one can instead use PhosphoELM database by typing "data(PhosphoELM)".
+data(PhosphoSite)
+
+## run CLUE with a repeat of 5 times and a range from 2 to 15
+set.seed(1)
+cl <- runClue(Tc=hES, annotation=PhosphoSite.human, rep=5, kRange=15)
+
+boxplot(cl$evlMat, col=rainbow(15), las=2, xlab="# cluster", ylab="Enrichment", main="CLUE")
+abline(v=(cl$maxK-1), col=rgb(1,0,0,.3))
+
+best <- clustOptimal(cl, rep=3, mfrow=c(4, 4))
+
+best$enrichList
+```
+
+1.3 help(runClue) Third
+Running CLUE with a gene expression dataset, discover optimal number of clusters, 
+clustering data accordingly, and identify key pathway involved in each cluster.
+
+```{r}
+## load mouse adipocyte gene expression data 
+# (Ma et al. Molecular and Cellular Biology. 2014, 34(19):3607-17)
+data(adipocyte)
+
+## load the KEGG annotations
+## note that one can instead use reactome, GOBP, biocarta database
+data(Pathways)
+
+## run CLUE with a repeat of 5 times and a range from 2 to 13
+
+set.seed(1)
+cl <- runClue(Tc=adipocyte, annotation=Pathways.KEGG, rep=5, kRange=13)
+
+boxplot(cl$evlMat, col=rainbow(13), las=2, xlab="# cluster", ylab="Enrichment", main="CLUE")
+abline(v=(cl$maxK-1), col=rgb(1,0,0,.3))
+```
+
+2. Once you have installed the package load the hES dataset as follow:
+Find out the dimension of the hES dataset
+
+```{r}
+library(ClueR)
+data(hES)
+dim(hES)
+```
+
+3. Create hierarchical clustering with respect to times (i.e. cluster the columns). How
+does time points cluster with each other? Does it make sense?
+```{r}
+library(limma)
+library(gplots)
+library(e1071)
+library(shiny)
+```
+
+```{r}
+# We transpose the matrix in order to perform hierarchical clustering with respect to the column
+hES.transpose <- t(hES)
+
+# We compute the distance matrix by euclidean
+hES.dist <- dist(hES.transpose, method = "euclidean")
+
+# visualise the clustering result
+plot(hclust(hES.dist), main = "Cluster Dengrogram", xlab="", sub="",ylab="", cex=1.0)
+
+#From the output, we can see that the first three time points clustered together than with later time points. This make sense as the phosphorylation sites changes through time and therefore profiles that are closer in time will look more similar and those that are far away in time will look more different.
+```
+
+4. Install package “e1071” and apply c-means clustering to partition the data in to 9
+groups (c=9) with respect to phosphorylation sites (i.e. partition rows into c groups).
+
+```{r}
+#Firstly, standardise the data to be unit free.
+
+standardize <- function(mat) {
+  means <- apply(mat, 1, mean)
+  stds <- apply(mat, 1, sd)
+  tmp <- sweep(mat, 1, means, FUN="-")
+  mat.stand <- sweep(tmp, 1, stds, FUN="/")
+  return(mat.stand)
+}
+hES.scaled <- standardize(hES)
+
+#Once the data is standardised the data to be unit free, perform clustering
+
+library(e1071)
+fc <- cmeans(hES.scaled, centers=9)
+
+#Visualise the clustering results using ClueR package function “fuzzPlot” as follows:
+fuzzPlot(hES.scaled, fc, mfrow = c(3, 3))
+```
+
+```{r}
+# load cluster validation package
+library(clValid)
+# since fuzzy c-means is not implemented in this package, we will use kmeans instead for validation. First, try using internal metrics
+internal <- clValid(hES.scaled, nClust=2:10, validation="internal", clMethods="kmeans", maxitems=nrow(hES.scaled))
+# summary of validation results
+summary(internal)
+
+# Try using stability metrics
+stability <- clValid(hES.scaled, nClust=2:10, validation="stability", clMethods="kmeans", maxitems=nrow(hES.scaled))
+
+# summary of validation results
+summary(stability)
+
+plot(internal)
+plot(stability)
+```
+
