@@ -1,0 +1,138 @@
+---
+title: "LDA"
+author: "Andy"
+date: "2018/9/2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Demonstration on using LDA for two-class data classification
+## Read in data
+```{r}
+setwd("/Users/Andy/Desktop/DataScience/5003/Week5/Tutorial/Classification/")
+# read in tab-delimited data file
+breastCancerFull <- read.delim("breast-w.txt", head = TRUE)
+```
+
+## Split the data into training (80%) and test sets (20%)
+```{r}
+library(caret)
+set.seed(1)
+inTrain <- createDataPartition(breastCancerFull$Class, p = .8)[[1]]
+breastCancerTrain <- breastCancerFull[ inTrain, ]
+breastCancerTest <- breastCancerFull[-inTrain, ]
+```
+
+## Build a LDA model using a single feature of "Cell_Size_Uniformity"
+```{r}
+# Here we create a logsitic regression model using the train() function. For the "method" parameter, "glm" stands for "generalized linear model" and using "glm" correspond to calling the "glm" package. This call will produce a logistic regression model.
+# This trControl parameter gives control of what methods to be used for evaluating and selecting model and how many times such procedure will be repeated. We will introduce model evaluation and selection in later lecutres.
+set.seed(1)
+LDA1 <- train(Class ~ Cell_Size_Uniformity, data = breastCancerTrain, method = "lda", trControl = trainControl(method = "repeatedcv", repeats = 5))
+
+## Print diagnostic and summary information and statistics for the model
+LDA1
+```
+
+## Buld another LDA model using a single feature of "Clump_Thickness"
+```{r}
+set.seed(1)
+LDA2 <- train(Class ~ Clump_Thickness, data = breastCancerTrain, method = "lda", trControl = trainControl(method = "repeatedcv", repeats = 5))
+LDA2
+```
+
+## Build a LDA model using all features
+```{r}
+# Notice that we used the training set of the data to training this and the above two LDA models.
+set.seed(1)
+LDAFull <- train(Class ~ ., data = breastCancerTrain, method = "lda", trControl = trainControl(method = "repeatedcv", repeats = 5))
+LDAFull
+```
+
+```{r}
+# Using $ sign to extract the model selected by our "trControl" procedure and print its information
+LDAFull$finalModel
+```
+
+## Prediction on the test set
+```{r}
+# Create prediction function taht takes in a LDA model and extract some prediction in formation from this model on predicting test set and subsequently return these prediction information.
+PredictFunc <- function(model){
+  breastCancerResults <- data.frame(obs = breastCancerTest$Class)
+  breastCancerResults$prob <- predict(model, breastCancerTest, type = "prob")[, "malignant"]
+  breastCancerResults$pred <- predict(model, breastCancerTest)
+  breastCancerResults$Label <- ifelse(breastCancerResults$obs == "malignant", "True Outcome: malignant", "True Outcome: benign")
+  return(breastCancerResults)
+}
+
+# Now use the three models that we created above to perform classification on the test set of data.
+breastCancerResult1 <- PredictFunc(LDA1)
+breastCancerResult2 <- PredictFunc(LDA2)
+breastCancerResultFull <- PredictFunc(LDAFull)
+```
+
+
+## Prediction results visualization
+```{r}
+library(gridExtra)
+hist1 <- histogram(~prob|Label, data = breastCancerResult1, layout = c(2, 1), nint = 20, xlab = "Probability of malignancy",
+          type = "count", main="LDA1")
+hist2 <- histogram(~prob|Label, data = breastCancerResult2, layout = c(2, 1), nint = 20, xlab = "Probability of malignancy",
+          type = "count", main="LDA2")
+hist3 <- histogram(~prob|Label, data = breastCancerResultFull, layout = c(2, 1), nint = 20, xlab = "Probability of malignancy",
+          type = "count", main="LDAFull")
+#grid.arrange(hist1, hist2, hist3, nrow=3)
+hist1
+hist2
+hist3
+```
+
+```{r}
+# Now, create the confusion matrix from the test set.
+confusionMatrix(data = breastCancerResult1$pred, reference = breastCancerResult1$obs)
+```
+
+```{r}
+confusionMatrix(data = breastCancerResult2$pred, reference = breastCancerResult2$obs)
+```
+
+```{r}
+confusionMatrix(data = breastCancerResultFull$pred, reference = breastCancerResultFull$obs)
+```
+
+## Using "pROC" package to evaluate, compare and visualize performance of each model
+```{r}
+library(pROC)
+breastCancerROC1 <- roc(breastCancerResult1$obs, breastCancerResult1$prob)
+breastCancerROC2 <- roc(breastCancerResult2$obs, breastCancerResult2$prob)
+breastCancerROCFull <- roc(breastCancerResultFull$obs, breastCancerResultFull$prob)
+
+# visualize and compare performacne using ROC curve. Note ROC curve stands for "receiver operating characteristic" curves
+plot(breastCancerROC1, legacy.axes = TRUE, col = "red")
+plot(breastCancerROC2, legacy.axes = TRUE, col = "blue", add = TRUE)
+plot(breastCancerROCFull, legacy.axes = TRUE, col = "black", add = TRUE)
+```
+

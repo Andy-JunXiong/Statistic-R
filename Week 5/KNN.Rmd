@@ -1,0 +1,153 @@
+---
+title: "KNN"
+author: "Andy"
+date: "2018/8/29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Demonstration on using k-nearest neighbor classifier for two-class data classification
+# Create sumulation dataset
+```{r}
+# create positive class sample with 2 descriptive features
+set.seed(3)
+f1 <- rnorm(100, mean=6, sd = 1)
+set.seed(4)
+f2 <- rnorm(100, mean=6, sd = 1)
+P.data <- cbind(f1, f2)
+
+# create positive class sample with 2 descriptive features
+set.seed(7)
+f1 <- rnorm(300, mean=4, sd = 1)
+set.seed(8)
+f2 <- rnorm(300, mean=4, sd = 1)
+N.data <- cbind(f1, f2)
+
+# combine all samples
+data.mat <- data.frame(rbind(P.data, N.data), Class=rep(c("P", "N"), time=c(nrow(P.data), nrow(N.data))))
+rownames(data.mat) <- paste("s", 1:(nrow(P.data)+nrow(N.data)), sep="")
+
+# plot data
+plot(P.data, col="red", pch=16, ylim=c(0, 9), xlim=c(0, 9))
+points(N.data, col="blue", pch=16)
+```
+
+## Split the data into training (80%) and test sets (20%)
+```{r}
+library(caret)
+set.seed(1)
+inTrain <- createDataPartition(data.mat$Class, p = .8)[[1]]
+dataTrain <- data.mat[ inTrain, ]
+dataTest <- data.mat[ -inTrain, ]
+```
+
+## Build a KNN model using a single feature of "f1"
+```{r}
+# Here we create a logistic regression model using the train() function. Fro the "method" parameter, "glm" stands for "generalized linear model" and using "glm" correspond to calling the "glm" package. This call will prodcue a logsitic regression model. 
+# The trControl parameter gives control of what methods to be used for evaluating and selecting model and how many times such procedure will be repeated. We will introduce model evaluation and selection in later lectures.
+set.seed(1)
+KNN1 <- train(Class ~ f1,0 data = dataTrain, method = "knn", trControl = trainControl(method = "repeatedcv", repeats = 5))
+
+## Print diagnostic and summary information and statistics for the model
+KNN1
+```
+
+## Build another KNN model using a single feature of "f2"
+```{r}
+set.seed(1)
+KNN2 <- train(Class ~ f2, data = dataTrain, method = "knn", trControl = trainControl(method = "repeatedcv", repeats = 5))
+KNN2
+```
+
+## Build a KNN model using all features
+```{r}
+# Notice that we used the training set of the data to training this and the above two KNN models.
+set.seed(1)
+KNNFULL <- train(Class ~., data = dataTrain, method = "knn", trControl = trainControl(method = "repeatedcv", repeats = 5))
+KNNFULL
+```
+
+## Prediction on the test set
+```{r}
+# Create prediction function that takes in a KNN model and extract some prediction in formation from this model on predicting test set and subsequently return these prediction information.
+PredictFunc <- function(model){
+  results <- data.frame(obs = dataTest$Class)
+  results$prob <- predict(model, dataTest, type = "prob")[, "P"]
+  results$Pred <- predict(model, dataTest)
+  results$Label <- ifelse(results$obs == "P","True Outcome: positive", "True Outcome: negative")
+  return(results)
+}
+
+# Now use the three models that we created above to perform classification on the test set of the data.
+results1 <- PredictFunc(KNN1)
+results2 <- PredictFunc(KNN2)
+resiltsFull <- PredictFunc(KNNFULL)
+```
+
+
+## Using "pROC" package to evaluate, compare and visualize performance of each model.
+```{r}
+library(pROC)
+ROC1 <- roc(results1$obs, results1$prob)
+ROC2 <- roc(results2$obs, results2$prob)
+ROCFULL <- roc(resiltsFull$obs, resultsFULL$prob)
+
+auc(ROC1)
+```
+
+```{r}
+# Visualize and compare performace using ROC curve. Note ROC curve stands for "receiver operating characteristic" curve
+plot(ROC1, legacy.axes = TRUE, col = "red")
+plot(ROC2, legacy.axes = TRUE, col = "blue", add = TRUE)
+plot(ROCFULL, legacy.axes = TRUE, col = "black", add = TRUE)
+```
+
+## Create classification decision boundary
+```{r}
+# plot data
+plot(P.data, col = "red", pch = 16, ylim = c(0,9), xlim = c(0,9))
+points(N.data, col = "blue", pch = 16)
+
+# mapping decision boundary
+for (x in seq(0, 10, by = 0.1)){
+  for (y in seq(0, 10, by = 0.1)){
+    t <- cbind(x, y)
+    colnames(t) <- c("f1", "f2")
+    if(predict(KNNFULL, t) == 'N'){
+      points(x, y, col = "lightblue", cex = 0.1)
+    }
+    else{
+      points(x, y, col = "orange", cex = 0.1)
+    }
+  }
+}
+```
+
+```{r}
+# output session information
+sessionInfo()
+```
+

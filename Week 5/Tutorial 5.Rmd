@@ -1,0 +1,244 @@
+---
+title: "Tutorial 5"
+author: "Jun Xiong"
+date: "2018/8/29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Create sumulation dataset
+```{r}
+# create positive class sample with 2 descriptive features
+set.seed(3)
+f1 <- rnorm(100, mean = 6, sd = 1.2)
+set.seed(4)
+f2 <- rnorm(100, mean = 6, sd = 1.2)
+P.data <- cbind(f1,f2)
+
+# create positive class sample with 2 descriptive features
+set.seed(7)
+f1 <- rnorm(300, mean = 4, sd = 1.2)
+set.seed(8)
+f2 <- rnorm(300, mean = 4, sd = 1.2)
+N.data <- cbind(f1,f2)
+
+# combine all samples
+data.mat <- data.frame(rbind(P.data, N.data), Class = rep(c(1,0), time = c(nrow(P.data), nrow(N.data))))
+```
+
+## Change from 1 and 0 to True and False
+```{r}
+data.mat$Label <- ifelse(data.mat$Class == 1, "True", "False")
+data.mat$Class <- NULL
+```
+
+## (1). Partition the data into 80% for model training (training set) and 20% for model testing (test set)
+```{r}
+# Load the "caret" package. This package is used to partition data, training and test classification model.
+library(caret)
+set.seed(1)
+inTrain <- createDataPartition(data.mat$Label, p = .8)[[1]]
+dataTrain <- data.mat[ inTrain, ]
+dataTest <- data.mat[-inTrain, ]
+```
+
+
+## (2). Train a logistic Regression, a LDA and a kNN (try different k value ) classifier using training dataset. Compare their performance using test dataset.
+# Logistic Regression
+```{r}
+set.seed(1)
+logisticReg_1 <- train(Label ~ ., data = dataTrain, method = "glm", trControl = trainControl(method = "repeatedcv", repeats = 5))
+logisticReg_1
+```
+```{r}
+summary(logisticReg_1)
+```
+```{r}
+logisticReg_1$finalModel
+```
+##Prediction on the test set
+```{r}
+# Create prediction function that takes in a logistic regression model and extract some prediction information from this model on predicting test set and subsequently return these prediction information.
+PredictFunc <- function(logisticReg) {
+  dataResults <- data.frame(obs = dataTest$Label)
+  dataResults$prob <- predict(logisticReg, dataTest, type = "prob")[, "True"]
+  dataResults$pred <- predict(logisticReg, dataTest)
+  dataResults$Label <- ifelse(dataResults$obs == "True", 
+                              "True Outcome: True", 
+                              "True Outcome: False")
+  return(dataResults)
+}
+
+# Now use the three models that we created above to perform classification on the test set of the data. 
+dataResult_Logistic <- PredictFunc(logisticReg_1)
+```
+
+# Prediction results visualization 
+```{r}
+library(gridExtra)
+hist1 <- histogram(~prob|Label, data = dataResult_Logistic, layout = c(2, 1), nint = 20, xlab = "Probability of True",
+          type = "count", main="LogisticReg")
+hist1
+```
+
+# Confusion matrix
+```{r}
+# Now, create the confusion matrix from the test set.
+confusionMatrix(data = dataResult_Logistic$pred, 
+                reference = dataResult_Logistic$obs)
+```
+
+# LDA
+```{r}
+set.seed(2)
+LDA <- train(Label ~ .,
+                     data = dataTrain,
+                     method = "lda",
+                     trControl = trainControl(method = "repeatedcv", 
+                                              repeats = 5))
+LDA
+```
+```{r}
+summary(LDA)
+```
+```{r}
+LDA$finalModel
+```
+# Prediction on the test set
+```{r}
+# Create prediction function that takes in a LDA model and extract some prediction information from this model on predicting test set and subsequently return these prediction information.
+PredictFunc <- function(model) {
+  dataresutLDA <- data.frame(obs = dataTest$Label)
+  dataresutLDA$prob <- predict(model, dataTest, type = "prob")[, "True"]
+  dataresutLDA$pred <- predict(model, dataTest)
+  dataresutLDA$Label <- ifelse(dataresutLDA$obs == "True", 
+                              "True Outcome: True", 
+                              "True Outcome: False")
+  return(dataresutLDA)
+}
+
+dataresult_LDA <- PredictFunc(LDA)
+```
+
+# Prediction results visualization
+```{r}
+library(gridExtra)
+hist1 <- histogram(~prob|Label, data = dataresult_LDA, layout = c(2, 1), nint = 20, xlab = "Probability of malignancy", type = "count", main="LDA")
+hist1
+```
+
+#Confusion matrix
+```{r}
+confusionMatrix(data = dataresult_LDA$pred, 
+                reference = dataresult_LDA$obs)
+```
+
+# KNN
+```{r}
+set.seed(3)
+KNN <- train(Label ~ .,
+                     data = dataTrain,
+                     method = "knn",
+                     trControl = trainControl(method = "repeatedcv", 
+                                              repeats = 5))
+
+KNN
+```
+```{r}
+summary(KNN)
+```
+```{r}
+KNN$finalModel
+```
+
+# Prediction on the test set
+```{r}
+# Create prediction function that takes in a KNN model and extract some prediction information from this model on predicting test set and subsequently return these prediction information.
+PredictFunc <- function(model) {
+  results <- data.frame(obs = dataTest$Label)
+  results$prob <- predict(model, dataTest, type = "prob")[, "True"]
+  results$pred <- predict(model, dataTest)
+  results$Label <- ifelse(results$obs == "True",
+                              "True Outcome: True", 
+                              "True Outcome: False")
+  return(results)
+}
+
+# Now use the three models that we created above to perform classification on the test set of the data. 
+resultKNN <- PredictFunc(KNN)
+```
+#Confusion matrix
+```{r}
+confusionMatrix(data = resultKNN$pred, 
+                reference = resultKNN$obs)
+```
+
+## (3). For kNN, identify optimal k value by minimising classficiation errror on test set.
+```{r}
+library(caret)
+library(class)
+set.seed(10)
+part = createFolds(y = dataTrain$Label,
+                   k = 5)
+
+knn1.err = c()
+knn5.err = c()
+knn10.err = c()
+for(i in 1:5){testIndex = part[[i]]
+          testData = dataTrain[testIndex,]
+          trainData = dataTrain[-testIndex,]
+          
+          knn1 = knn(train = trainData[,-3],
+                  test = testData[,-3],
+                  cl = trainData[,3],
+                  k =1)
+          knn1.err[i]= sum(knn1 != testData[,3])
+           
+          knn5 = knn(train = trainData[,-3],
+                  test = testData[,-3],
+                  cl = trainData[,3],
+                  k =5)
+          knn5.err[i]= sum(knn5 != testData[,3])
+          
+          knn10 = knn(train = trainData[,-3],
+                  test = testData[,-3],
+                  cl = trainData[,3],
+                  k =10)
+          knn10.err[i]= sum(knn10 != testData[,3])
+          }
+mean(knn1.err)
+mean(knn5.err)
+mean(knn10.err)
+```
+```{r}
+print("k = 10 is optimal")
+```
+
+## (4). Now we used test set to select optimal k, is it still valid to use this test set to evaluate the performance of our optimised kNN classifier? Why or Why not?
+```{r}
+print("Yes , it is valid to use to evaluate the performance of optimised KNN classifier because the test set was unseen and not being used for model before. so it is OK to use the test set to validate the k")
+```
+
