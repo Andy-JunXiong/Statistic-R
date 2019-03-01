@@ -1,0 +1,87 @@
+---
+title: "Tutorial 6"
+author: "Andy"
+date: "2018/9/5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## (2). Design a 10-fold cross-validation procedure to evaluate logistic regression and kNN (k=3) classification accurary.
+## (3). Calculate TP, TN, FP, FN and compute sensitivity and specificity for each
+## (4). Compute F1 score and compare the two classifiers
+
+```{r}
+setwd("/Users/Andy/Desktop/DataScience/5003/Week6/cv_and_btstrp")
+source("functions_w6.R")
+breast_data <- read.delim("breast.txt", sep = "", header = TRUE)
+```
+```{r}
+library(caret)
+```
+```{r}
+library(class)
+library(MASS)
+library(mlbench)
+```
+
+```{r}
+# create cross validation folds
+set.seed(1)
+fold <- createFolds(breast_data$Class, k=10)
+# apply 10-fold cross-validation
+knn.TP <- knn.TN <- knn.FP <- knn.FN <- c()
+logit.TP <- logit.TN <- logit.FP <- logit.FN <- c()
+
+for(i in 1:length(fold)){
+  # true lable for fold i
+  truth <- breast_data$Class[fold[[i]]]
+  
+  # apply knn for classification
+  preds<-knn(breast_data[-fold[[i]],-10], breast_data[fold[[i]],-10], breast_data$Class[-fold[[i]]], k=3)
+  knn.TP<-c(knn.TP,sum((truth==preds)[truth== 1]))
+  knn.TN<-c(knn.TN,sum((truth==preds)[truth== 0]))
+  knn.FP<-c(knn.FP,sum((truth!=preds)[truth== 1]))
+  knn.FN<-c(knn.FN,sum((truth!=preds)[truth== 0]))
+  # apply logistic regression for classification
+  logitmodel <- glm(Class~., data=breast_data[-fold[[i]],], family="binomial")
+  pred_logit <- predict(logitmodel, newdata=breast_data[fold[[i]], -10])
+  preds <- ifelse(pred_logit>0, 1,0)
+  logit.TP<-c(logit.TP,sum((truth==preds)[truth== 1]))
+  logit.TN<-c(logit.TN,sum((truth==preds)[truth== 0]))
+  logit.FP<-c(logit.FP,sum((truth!=preds)[truth== 1]))
+  logit.FN<-c(logit.FN,sum((truth!=preds)[truth== 0]))
+}
+```
+```{r}
+# evaluation
+evaluate(knn.TN, knn.FP, knn.TP, knn.FN)
+```
+
+```{r}
+# evaluation
+evaluate(logit.TN, logit.FP, logit.TP, logit.FN)
+```
+
